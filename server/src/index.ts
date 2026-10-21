@@ -68,6 +68,14 @@ const server = Bun.serve({
       },
       OPTIONS: () => new Response(null, { headers: CORS }),
     },
+    // Diagnóstico remoto: la tele manda aquí lo que no podemos ver con el inspector
+    "/api/debug": {
+      POST: async (req) => {
+        console.log("[tele]", JSON.stringify(await req.json()));
+        return json({ ok: true });
+      },
+      OPTIONS: () => new Response(null, { headers: CORS }),
+    },
     "/api/scan": {
       POST: () => {
         void scan();

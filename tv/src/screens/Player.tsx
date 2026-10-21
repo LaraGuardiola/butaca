@@ -33,6 +33,8 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
   let closePanel: (() => void) | undefined
   let panelEl!: HTMLDivElement
   let finished = false
+  /** Hasta que el vídeo arranca, ignoramos pausa/seek: el OK que abre el reproductor puede llegar de rebote. */
+  let ready = false
 
   const shown = () => scrub() ?? t()
   const nextVisible = createMemo(() => !!m()?.next && dur() > 0 && t() > dur() - NEXT_CARD_SEC && !panel())
@@ -63,16 +65,17 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
   }
 
   function togglePause() {
-    if (!engine) return
-    if (paused()) engine.play()
+    if (!engine || !ready) return
+    if (engine.isPaused()) engine.play()
     else engine.pause()
-    setPaused(!paused())
-    showOsd(!paused())
+    // El estado lo manda el motor, no nuestra suposición
+    setPaused(engine.isPaused())
+    showOsd(paused())
   }
 
   /** Avance/retroceso acumulativo: cuanto más rato mantienes la flecha, más rápido. */
   function nudge(dir: 1 | -1) {
-    if (!engine || !dur()) return
+    if (!engine || !ready || !dur()) return
     scrubHits++
     const step = 10 * Math.min(6, 1 + Math.floor(scrubHits / 4))
     const target = Math.max(0, Math.min(dur() - 2, (scrub() ?? t()) + dir * step))
@@ -189,6 +192,8 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
       await engine.load(url(info.stream)!, props.startFromZero ? 0 : info.position, { uhd: info.width > 2000 })
       setDur(engine.duration() || info.duration)
       setBuffering(false)
+      setPaused(engine.isPaused())
+      ready = true
       showOsd()
     } catch (e) {
       setError((e as Error).message)

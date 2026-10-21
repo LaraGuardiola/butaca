@@ -15,6 +15,7 @@ export interface Player {
   seek(sec: number): void
   time(): number
   duration(): number
+  isPaused(): boolean
   /** `order`: posición entre las pistas de audio, igual que en ffprobe. */
   setAudio(order: number): void
   suspend(): void
@@ -32,13 +33,6 @@ class AvPlayer implements Player {
 
   constructor(ev: PlayerEvents) {
     this.ev = ev
-    // AVPlay pinta en este <object>; fuera de la tele el navegador mostraría "plugin not supported"
-    if (!document.getElementById('avplayer')) {
-      const obj = document.createElement('object')
-      obj.id = 'avplayer'
-      obj.type = 'application/avplayer'
-      document.body.prepend(obj)
-    }
   }
 
   load(src: string, startSec: number, opts: { uhd: boolean }) {
@@ -87,6 +81,9 @@ class AvPlayer implements Player {
   }
   time() {
     return this.t
+  }
+  isPaused() {
+    return this.av.getState() === 'PAUSED'
   }
   duration() {
     return this.dur
@@ -138,6 +135,9 @@ class HtmlPlayer implements Player {
   }
   time() {
     return this.v.currentTime
+  }
+  isPaused() {
+    return this.v.paused
   }
   duration() {
     return this.v.duration || 0

@@ -43,8 +43,9 @@ button { font: inherit; color: inherit; cursor: pointer; outline: none; }
   z-index: 1;
 }
 
-/* Capas de vídeo: AVPlay pinta debajo de la web; <video> solo en el PC */
-#avplayer, #html-video {
+/* AVPlay pinta en el plano de vídeo, debajo de la web, sin <object> (con él la tele dibuja
+   un indicador de carga que se queda). <video> solo se usa en el PC. */
+#html-video {
   position: fixed;
   left: 0;
   top: 0;
