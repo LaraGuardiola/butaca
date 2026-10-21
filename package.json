@@ -1,0 +1,11 @@
+{
+  "name": "butaca",
+  "private": true,
+  "scripts": {
+    "server": "bun --cwd server src/index.ts",
+    "dev:server": "bun --cwd server --watch src/index.ts",
+    "dev:tv": "bun --cwd tv vite",
+    "build:tv": "bun --cwd tv vite build",
+    "deploy:tv": "scripts/tv-deploy.sh"
+  }
+}

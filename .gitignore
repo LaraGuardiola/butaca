@@ -1,0 +1,6 @@
+node_modules
+dist
+*.wgt
+butaca.config.json
+.buildResult
+build
