@@ -54,6 +54,12 @@ CREATE TABLE IF NOT EXISTS progress (
 );
 `);
 
+// Migraciones: columnas añadidas después de la primera versión
+const mediaCols = new Set(db.query<{ name: string }, []>("PRAGMA table_info(media)").all().map((c) => c.name));
+for (const [col, type] of [["trick", "TEXT"], ["intro_start", "REAL"], ["intro_end", "REAL"], ["intro_checked", "INTEGER"]]) {
+  if (!mediaCols.has(col)) db.exec(`ALTER TABLE media ADD COLUMN ${col} ${type}`);
+}
+
 export type TitleRow = {
   id: number; kind: "movie" | "show"; key: string; name: string; year: number | null;
   overview: string | null; tagline: string | null; genres: string | null; rating: number | null;
@@ -67,6 +73,8 @@ export type MediaRow = {
   still: string | null; duration: number | null; container: string | null; vcodec: string | null;
   width: number | null; height: number | null; hdr: string | null; audio: string; subs: string;
   added_at: number;
+  trick: string | null; // JSON TrickInfo
+  intro_start: number | null; intro_end: number | null; intro_checked: number | null;
 };
 
 export type ProgressRow = { media_id: number; position: number; duration: number; done: number; updated_at: number };

@@ -1,0 +1,17 @@
+[Unit]
+Description=Butaca, servidor multimedia para la tele
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+WorkingDirectory=%h/Projects/butaca/server
+ExecStart=%h/.bun/bin/bun src/index.ts
+Restart=on-failure
+RestartSec=3
+# El escaneo y la generación de miniaturas no deben notarse en el escritorio
+Nice=10
+IOSchedulingClass=idle
+Environment=PATH=%h/.local/bin:/usr/local/bin:/usr/bin
+
+[Install]
+WantedBy=default.target

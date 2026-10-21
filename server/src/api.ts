@@ -4,6 +4,7 @@ import { existsSync } from "node:fs";
 import { paths } from "./config.ts";
 import { db, type MediaRow, type ProgressRow, type TitleRow } from "./db.ts";
 import { extractVtt, TEXT_SUBS, type AudioTrack, type SubTrack } from "./probe.ts";
+import type { TrickInfo } from "./jobs.ts";
 
 /** Lo que la QN90B decodifica por hardware (Tizen 6.5). DTS y TrueHD no están. */
 const TV_VIDEO = new Set(["h264", "hevc", "vp9", "av1", "mpeg2video", "mpeg4"]);
@@ -147,6 +148,14 @@ export function media(id: number) {
     subs: subs.filter((s) => TEXT_SUBS.has(s.codec)).map((s) => ({ ...s, url: `/subs/${m.id}/${s.index}.vtt` })),
     defaultSub: defSub,
     next: next && { id: next.id, name: next.name, label: epLabel(next), still: img(next.still) },
+    intro: m.intro_start != null && m.intro_end != null ? { start: m.intro_start, end: m.intro_end } : null,
+    trick: m.trick
+      ? (() => {
+          const t: TrickInfo = JSON.parse(m.trick);
+          const pad = (n: number) => String(n).padStart(3, "0");
+          return { ...t, urls: Array.from({ length: t.sheets }, (_, i) => `/img/trick/${m.id}-${pad(i + 1)}.jpg`) };
+        })()
+      : null,
   };
 }
 

@@ -5,6 +5,7 @@ import { config, paths } from "./config.ts";
 import { db, type MediaRow } from "./db.ts";
 import { scan } from "./scanner.ts";
 import * as api from "./api.ts";
+import { ambient } from "./lights.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -76,6 +77,14 @@ const server = Bun.serve({
       },
       OPTIONS: () => new Response(null, { headers: CORS }),
     },
+    "/api/ambient": {
+      POST: async (req) => {
+        const { event } = await req.json();
+        if (event === "play" || event === "pause" || event === "stop") ambient(event);
+        return json({ ok: true });
+      },
+      OPTIONS: () => new Response(null, { headers: CORS }),
+    },
     "/api/scan": {
       POST: () => {
         void scan();
@@ -95,6 +104,10 @@ const server = Bun.serve({
       } catch (e) {
         return json({ error: (e as Error).message }, 500);
       }
+    },
+    "/img/trick/:file": (req) => {
+      const f = Bun.file(join(paths.img, "trick", normalize(req.params.file).replace(/^(\.\.[/\\])+/, "")));
+      return new Response(f, { headers: { ...CORS, "Cache-Control": "public, max-age=86400" } });
     },
     "/img/:file": (req) => {
       const f = Bun.file(join(paths.img, normalize(req.params.file).replace(/^(\.\.[/\\])+/, "")));

@@ -46,7 +46,7 @@ export async function probe(path: string): Promise<Probe> {
 }
 
 /** Bandas negras (letterbox) alrededor de `at`, como filtro crop=w:h:x:y. */
-async function detectCrop(path: string, at: number): Promise<string | null> {
+export async function detectCrop(path: string, at: number): Promise<string | null> {
   const p = Bun.spawn(
     ["ffmpeg", "-ss", String(Math.max(0, at)), "-i", path, "-frames:v", "12", "-vf", "cropdetect=limit=24:round=2:reset=0", "-f", "null", "-"],
     { stdout: "ignore", stderr: "pipe" },

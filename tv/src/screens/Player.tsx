@@ -11,6 +11,11 @@ import type { MediaInfo } from '../types'
 const OSD_MS = 4000
 const SAVE_MS = 10_000
 const NEXT_CARD_SEC = 40
+const THUMB_W = 384
+const THUMB_H = 216
+
+/** La bombilla: el servidor atenúa al reproducir y restaura al salir. */
+const ambient = (event: 'play' | 'pause' | 'stop') => post('/api/ambient', { event })
 
 export default function Player(props: { mediaId: number; startFromZero?: boolean }) {
   const [m, setM] = createSignal<MediaInfo>()
@@ -38,6 +43,27 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
 
   const shown = () => scrub() ?? t()
   const nextVisible = createMemo(() => !!m()?.next && dur() > 0 && t() > dur() - NEXT_CARD_SEC && !panel())
+  const introVisible = createMemo(() => {
+    const i = m()?.intro
+    return !!i && dur() > 0 && t() >= i.start && t() < i.end - 2 && !panel() && scrub() == null
+  })
+  /** Miniatura de la hoja de sprites para el instante que se está buscando. */
+  const thumb = createMemo(() => {
+    const tp = m()?.trick
+    const at = scrub()
+    if (!tp || at == null || !dur()) return null
+    const per = tp.cols * tp.rows
+    const idx = Math.floor(at / tp.interval)
+    const sheet = Math.min(tp.urls.length - 1, Math.floor(idx / per))
+    const cell = idx - sheet * per
+    const x = Math.max(96, Math.min(1824 - THUMB_W, 96 + (at / dur()) * 1728 - THUMB_W / 2))
+    return {
+      x,
+      url: url(tp.urls[sheet])!,
+      size: `${tp.cols * THUMB_W}px ${tp.rows * THUMB_H}px`,
+      pos: `${-(cell % tp.cols) * THUMB_W}px ${-Math.floor(cell / tp.cols) * THUMB_H}px`,
+    }
+  })
   const lines = createMemo(() => activeCues(cues(), t()).flatMap((c) => c.lines))
 
   function showOsd(stay = false) {
@@ -70,7 +96,15 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
     else engine.pause()
     // El estado lo manda el motor, no nuestra suposición
     setPaused(engine.isPaused())
+    ambient(paused() ? 'pause' : 'play')
     showOsd(paused())
+  }
+
+  function skipIntro() {
+    const i = m()?.intro
+    if (!engine || !i) return
+    engine.seek(i.end)
+    setT(i.end)
   }
 
   /** Avance/retroceso acumulativo: cuanto más rato mantienes la flecha, más rápido. */
@@ -127,7 +161,8 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
           back()
           break
         case 'ok':
-          if (nextVisible()) playNext()
+          if (introVisible()) skipIntro()
+          else if (nextVisible()) playNext()
           else togglePause()
           break
         case 'playpause':
@@ -162,7 +197,11 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
       if (document.hidden) {
         save()
         engine?.suspend()
-      } else engine?.resume()
+        ambient('stop')
+      } else {
+        engine?.resume()
+        if (!paused()) ambient('play')
+      }
     }
     document.addEventListener('visibilitychange', onVisibility)
 
@@ -174,6 +213,7 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
       document.removeEventListener('visibilitychange', onVisibility)
       if (!finished) save()
       engine?.destroy()
+      ambient('stop')
       document.documentElement.classList.remove('playing')
     })
 
@@ -195,6 +235,9 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
       setPaused(engine.isPaused())
       ready = true
       showOsd()
+      ambient('play')
+      // Precarga de las hojas de miniaturas para que el avance sea instantáneo
+      for (const u of info.trick?.urls ?? []) new Image().src = url(u)!
     } catch (e) {
       setError((e as Error).message)
     }
@@ -230,6 +273,17 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
             </Show>
 
             <div class="osd osd-bottom">
+              <Show when={thumb()}>
+                {(th) => (
+                  <div class="trick" style={{ transform: `translateX(${th().x - 96}px)` }}>
+                    <div
+                      class="trick-img"
+                      style={{ 'background-image': `url("${th().url}")`, 'background-size': th().size, 'background-position': th().pos }}
+                    />
+                    <div class="trick-time">{clock(scrub()!)}</div>
+                  </div>
+                )}
+              </Show>
               <div class="timeline">
                 <div class="timeline-fill" style={{ width: `${dur() ? (shown() / dur()) * 100 : 0}%` }}>
                   <div class="timeline-thumb" classList={{ scrubbing: scrub() != null }} />
@@ -241,6 +295,10 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
                 <span>-{clock(dur() - shown())}</span>
               </div>
             </div>
+
+            <Show when={introVisible()}>
+              <div class="skip-intro">Saltar intro</div>
+            </Show>
 
             <Show when={nextVisible()}>
               <div class="next-card">

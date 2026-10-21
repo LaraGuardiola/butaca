@@ -1,4 +1,7 @@
 {
-  "libraries": ["~/Downloads"],
-  "port": 8420
+  "libraries": [
+    "~/Downloads"
+  ],
+  "port": 8420,
+  "lights": []
 }

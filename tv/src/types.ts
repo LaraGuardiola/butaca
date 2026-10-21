@@ -60,4 +60,6 @@ export type MediaInfo = {
   subs: (Track & { url: string })[]
   defaultSub: number | null
   next: { id: number; name: string | null; label: string; still: string | null } | null
+  intro: { start: number; end: number } | null
+  trick: { interval: number; w: number; h: number; cols: number; rows: number; urls: string[] } | null
 }

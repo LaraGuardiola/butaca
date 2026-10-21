@@ -2,7 +2,7 @@ import { homedir } from "node:os";
 import { join, resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 
-type FileConfig = { libraries?: string[]; port?: number; tmdbToken?: string };
+type FileConfig = { libraries?: string[]; port?: number; tmdbToken?: string; lights?: string[] };
 
 const root = resolve(import.meta.dir, "../..");
 const file: FileConfig = await Bun.file(join(root, "butaca.config.json")).json().catch(() => ({}));
@@ -16,6 +16,8 @@ export const config = {
   tmdbToken: process.env.TMDB_TOKEN ?? file.tmdbToken,
   dataDir: expand(process.env.BUTACA_DATA ?? "~/.local/share/butaca"),
   minVideoBytes: 50 * 1024 * 1024,
+  /** IPs de bombillas Tapo para el modo cine (vacío = desactivado). */
+  lights: file.lights ?? [],
 };
 
 export const paths = {

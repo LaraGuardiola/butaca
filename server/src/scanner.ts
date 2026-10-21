@@ -5,6 +5,7 @@ import { db, type MediaRow } from "./db.ts";
 import { parseFile, showKey } from "./parse.ts";
 import { probe } from "./probe.ts";
 import { enrichPending } from "./artwork.ts";
+import { runJobs } from "./jobs.ts";
 
 const VIDEO = new Set([".mkv", ".mp4", ".m4v", ".mov", ".avi", ".ts", ".m2ts", ".webm"]);
 
@@ -68,7 +69,7 @@ async function doScan(log: (s: string) => void) {
              $width, $height, $hdr, $audio, $subs, $now)
            ON CONFLICT(path) DO UPDATE SET title_id=$t, size=$size, mtime=$mtime, season=$season, episode=$episode,
              duration=$duration, container=$container, vcodec=$vcodec, width=$width, height=$height, hdr=$hdr,
-             audio=$audio, subs=$subs`,
+             audio=$audio, subs=$subs, trick=NULL, intro_checked=NULL`,
         ).run({
           $t: titleId, $path: path, $size: st.size, $mtime: Math.floor(st.mtimeMs),
           $season: p.kind === "episode" ? p.season : null, $episode: p.kind === "episode" ? p.episode : null,
@@ -90,5 +91,6 @@ async function doScan(log: (s: string) => void) {
   db.exec("DELETE FROM titles WHERE id NOT IN (SELECT DISTINCT title_id FROM media)");
 
   await enrichPending(log);
+  void runJobs(log);
   log(`Escaneo listo en ${((performance.now() - t0) / 1000).toFixed(1)}s: ${added} nuevos, ${gone.length} retirados`);
 }
