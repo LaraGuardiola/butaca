@@ -26,7 +26,8 @@ html, body {
   font-family: 'Inter Variable', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
 }
-body.playing { background: transparent; }
+/* AVPlay pinta el vídeo en un plano por DEBAJO de la web: todo lo que hay encima debe ser transparente */
+html.playing, html.playing body { background: transparent; }
 
 button { font: inherit; color: inherit; cursor: pointer; outline: none; }
 

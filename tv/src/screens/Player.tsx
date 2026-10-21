@@ -109,7 +109,7 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
   }
 
   onMount(async () => {
-    document.body.classList.add('playing')
+    document.documentElement.classList.add('playing')
 
     const offKeys = onKey((a) => {
       if (panel()) {
@@ -171,7 +171,7 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
       document.removeEventListener('visibilitychange', onVisibility)
       if (!finished) save()
       engine?.destroy()
-      document.body.classList.remove('playing')
+      document.documentElement.classList.remove('playing')
     })
 
     try {
