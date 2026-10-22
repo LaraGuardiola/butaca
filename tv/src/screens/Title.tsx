@@ -16,6 +16,8 @@ export default function Title(props: { id: number; active: () => boolean }) {
   const [t, setT] = createStore<{ v?: TitleDetail }>({})
   const [season, setSeason] = createSignal<number>()
   const [inEpisodes, setInEpisodes] = createSignal(false)
+  /** Último episodio enfocado: los botones de arriba actúan sobre él (reanudar o empezar de cero). */
+  const [picked, setPicked] = createSignal<Episode>()
   let el!: HTMLDivElement
   let first = true
 
@@ -35,9 +37,21 @@ export default function Title(props: { id: number; active: () => boolean }) {
 
   const episodes = () => t.v?.seasons.find((s) => s.season === season())?.episodes ?? []
   const isShow = () => t.v?.kind === 'show'
-  const resuming = () => t.v?.play?.label.startsWith('Reanudar')
 
   const playEpisode = (e: Episode) => go({ name: 'player', mediaId: e.id, startFromZero: e.progress >= 1 })
+
+  /** Qué hacen los botones: el episodio elegido o, si no hay, lo que propone el servidor. */
+  const action = () => {
+    const e = picked()
+    if (e) {
+      const resume = e.progress > 0 && e.progress < 1
+      const ep = e.episode != null ? ` T${e.season ?? 1}:E${e.episode}` : ''
+      return { mediaId: e.id, label: `${resume ? 'Reanudar' : 'Reproducir'}${ep}`, resume, fromZero: e.progress >= 1 }
+    }
+    const p = t.v?.play
+    if (!p) return null
+    return { mediaId: p.mediaId, label: p.label, resume: p.label.startsWith('Reanudar'), fromZero: false }
+  }
 
   return (
     <div class="title-screen" ref={el} classList={{ 'in-episodes': inEpisodes() }}>
@@ -55,7 +69,7 @@ export default function Title(props: { id: number; active: () => boolean }) {
                 <p class="overview clamp-4">{d().overview}</p>
               </Show>
               <div class="actions" data-nav-group>
-                <Show when={d().play}>
+                <Show when={action()}>
                   {(p) => (
                     <button
                       class="btn btn-primary"
@@ -63,19 +77,19 @@ export default function Title(props: { id: number; active: () => boolean }) {
                       data-autofocus
                       tabIndex={-1}
                       onFocus={() => setInEpisodes(false)}
-                      onClick={() => go({ name: 'player', mediaId: p().mediaId })}
+                      onClick={() => go({ name: 'player', mediaId: p().mediaId, startFromZero: p().fromZero })}
                     >
                       <span class="icon-play" /> {p().label}
                     </button>
                   )}
                 </Show>
-                <Show when={resuming()}>
+                <Show when={action()?.resume}>
                   <button
                     class="btn"
                     data-focusable
                     tabIndex={-1}
                     onFocus={() => setInEpisodes(false)}
-                    onClick={() => go({ name: 'player', mediaId: d().play!.mediaId, startFromZero: true })}
+                    onClick={() => go({ name: 'player', mediaId: action()!.mediaId, startFromZero: true })}
                   >
                     Desde el principio
                   </button>
@@ -120,6 +134,7 @@ export default function Title(props: { id: number; active: () => boolean }) {
                           onFocus={() => {
                             focused()
                             setInEpisodes(true)
+                            setPicked(e)
                           }}
                           onClick={() => playEpisode(e)}
                         >

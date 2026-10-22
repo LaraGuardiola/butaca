@@ -150,7 +150,8 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
 
     const offKeys = onKey((a) => {
       if (panel()) {
-        if (a === 'back' || a === 'up') hidePanel()
+        // Arriba/abajo recorren las pistas; solo Atrás cierra el panel
+        if (a === 'back') hidePanel()
         else navHandler(a)
         return true
       }

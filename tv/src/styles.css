@@ -373,7 +373,6 @@ button { font: inherit; color: inherit; cursor: pointer; outline: none; }
   box-shadow: 0 18px 40px rgba(0, 0, 0, 0.6);
   animation: rise-in 0.35s var(--ease);
 }
-.skip-intro::after { content: '  OK'; font-size: 20px; font-weight: 700; color: #777; }
 
 .next-card {
   position: absolute;
