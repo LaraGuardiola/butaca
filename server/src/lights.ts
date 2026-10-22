@@ -1,15 +1,18 @@
 // Modo cine: la bombilla Tapo baja al reproducir, sube un poco en pausa y vuelve a su estado al salir.
-// Usa el CLI de python-kasa. Si la bombilla estaba apagada no se toca: no queremos encender luces solas.
+// Habla con lights.py (python-kasa con la conexión abierta) para que el fundido sea continuo.
+// Si la bombilla estaba apagada no se toca: no queremos encender luces solas.
+import { realpathSync } from "node:fs";
+import { dirname, join } from "node:path";
 import { homedir } from "node:os";
-import { join } from "node:path";
 import { config } from "./config.ts";
 
 type Event = "play" | "pause" | "stop";
 type Saved = { on: boolean; brightness: number };
+type Reply = { id: number; error?: string; on?: boolean; brightness?: number };
 
-const KASA = Bun.which("kasa") ?? join(homedir(), ".local/bin/kasa");
 const DIM = 6;
 const PAUSE = 35;
+const FADE_MS: Record<Event, number> = { play: 3000, pause: 1200, stop: 2500 };
 /** "stop" espera un poco: al pasar al siguiente episodio llega "play" enseguida y no queremos parpadeo. */
 const STOP_GRACE_MS = 4000;
 
@@ -18,51 +21,73 @@ let queue: Promise<void> = Promise.resolve();
 let stopTimer: Timer | undefined;
 let last: Event = "stop";
 
-/** Sin discovery UDP (falla a menudo en la wifi de 2,4 GHz): le decimos qué es la bombilla. Un reintento. */
-async function kasa(host: string, ...args: string[]): Promise<string> {
-  for (let attempt = 0; ; attempt++) {
-    const p = Bun.spawn(
-      [KASA, "--host", host, "--device-family", "SMART.TAPOBULB", "--encrypt-type", "KLAP", ...args],
-      { stdout: "pipe", stderr: "pipe" },
-    );
-    const out = await new Response(p.stdout).text();
-    if ((await p.exited) === 0 && !/Raised error/.test(out)) return out;
-    if (attempt >= 1) throw new Error(`kasa ${args.join(" ")} falló en ${host}`);
+/** El Python del entorno de uv donde vive python-kasa (el CLI `kasa` es un enlace a ese entorno). */
+function kasaPython() {
+  const kasa = Bun.which("kasa") ?? join(homedir(), ".local/bin/kasa");
+  try {
+    return join(dirname(realpathSync(kasa)), "python");
+  } catch {
+    return "python3";
   }
 }
 
-async function readState(host: string): Promise<Saved> {
-  const out = await kasa(host, "state");
+let helper: ReturnType<typeof spawnHelper> | null = null;
+
+function spawnHelper() {
+  const proc = Bun.spawn([kasaPython(), join(import.meta.dir, "lights.py")], {
+    stdin: "pipe",
+    stdout: "pipe",
+    stderr: "inherit",
+  });
+  const pending = new Map<number, (r: Reply) => void>();
+  let seq = 0;
+  void (async () => {
+    let buf = "";
+    for await (const chunk of proc.stdout.pipeThrough(new TextDecoderStream())) {
+      buf += chunk;
+      let nl: number;
+      while ((nl = buf.indexOf("\n")) >= 0) {
+        const r = JSON.parse(buf.slice(0, nl)) as Reply;
+        buf = buf.slice(nl + 1);
+        pending.get(r.id)?.(r);
+        pending.delete(r.id);
+      }
+    }
+  })();
+  void proc.exited.then(() => {
+    helper = null;
+    for (const done of pending.values()) done({ id: -1, error: "el ayudante de luces se ha cerrado" });
+  });
   return {
-    on: /Device state: True/.test(out),
-    brightness: Number(out.match(/Brightness \(brightness\): (\d+)/)?.[1] ?? 100),
+    send(msg: Record<string, unknown>) {
+      const id = ++seq;
+      return new Promise<Reply>((resolve) => {
+        pending.set(id, resolve);
+        proc.stdin.write(JSON.stringify({ id, ...msg }) + "\n");
+        proc.stdin.flush();
+      }).then((r) => {
+        if (r.error) throw new Error(r.error);
+        return r;
+      });
+    },
   };
 }
 
-/** Fundido en tres pasos (la bombilla ya suaviza cada cambio). */
-async function fade(host: string, from: number, to: number) {
-  for (const k of [1, 2, 3]) await kasa(host, "light", "brightness", String(Math.round(from + ((to - from) * k) / 3)));
-}
-
-const current = new Map<string, number>();
+const send = (msg: Record<string, unknown>) => (helper ??= spawnHelper()).send(msg);
 
 async function apply(event: Event) {
   for (const host of config.lights) {
     try {
       if (event !== "stop" && !saved.has(host)) {
-        const s = await readState(host);
-        saved.set(host, s);
-        current.set(host, s.brightness);
+        const r = await send({ op: "state", host });
+        saved.set(host, { on: !!r.on, brightness: r.brightness ?? 100 });
       }
       const s = saved.get(host);
       if (!s?.on) continue;
       const target = event === "play" ? Math.min(DIM, s.brightness) : event === "pause" ? Math.min(PAUSE, s.brightness) : s.brightness;
-      await fade(host, current.get(host) ?? s.brightness, target);
-      current.set(host, target);
-      if (event === "stop") {
-        saved.delete(host);
-        current.delete(host);
-      }
+      if (event === "stop") saved.delete(host);
+      // Sin await: el fundido corre en segundo plano y uno nuevo lo corta
+      send({ op: "fade", host, to: target, ms: FADE_MS[event] }).catch((e) => console.warn(`luz ${host}: ${e.message}`));
     } catch (e) {
       console.warn(`luz ${host}: ${(e as Error).message}`);
     }

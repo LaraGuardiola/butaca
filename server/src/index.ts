@@ -6,6 +6,8 @@ import { db, type MediaRow } from "./db.ts";
 import { scan } from "./scanner.ts";
 import * as api from "./api.ts";
 import { ambient } from "./lights.ts";
+import { liveStream, startOf } from "./transcode.ts";
+import type { AudioTrack } from "./probe.ts";
 
 const CORS = {
   "Access-Control-Allow-Origin": "*",
@@ -95,6 +97,17 @@ const server = Bun.serve({
       const m = db.query<MediaRow, [number]>("SELECT path FROM media WHERE id=?").get(Number(req.params.id));
       if (!m) return notFound();
       return serveRange(req, m.path, MIME[extname(m.path).toLowerCase()] ?? "application/octet-stream");
+    },
+    "/stream/:id/live": (req) => {
+      const m = db.query<MediaRow, [number]>("SELECT path, audio FROM media WHERE id=?").get(Number(req.params.id));
+      if (!m) return notFound();
+      return liveStream(req, m.path, JSON.parse(m.audio) as AudioTrack[], CORS);
+    },
+    "/api/live-start/:id": async (req) => {
+      const m = db.query<MediaRow, [number]>("SELECT path FROM media WHERE id=?").get(Number(req.params.id));
+      if (!m) return notFound();
+      const t = Number(new URL(req.url).searchParams.get("t")) || 0;
+      return json({ t: await startOf(m.path, t) });
     },
     "/subs/:id/:file": async (req) => {
       const index = Number.parseInt(req.params.file);

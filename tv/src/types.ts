@@ -53,6 +53,9 @@ export type MediaInfo = {
   height: number
   hdr: string | null
   stream: string
+  /** Audio no soportado convertido al vuelo; se pide con ?t=segundos */
+  live: string
+  mode: 'direct' | 'live' | 'none'
   directPlay: boolean
   unsupported: string[]
   position: number

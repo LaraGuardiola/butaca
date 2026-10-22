@@ -3,12 +3,12 @@ import { join } from "node:path";
 import { existsSync } from "node:fs";
 import { paths } from "./config.ts";
 import { db, type MediaRow, type ProgressRow, type TitleRow } from "./db.ts";
+import { TV_AUDIO } from "./transcode.ts";
 import { extractVtt, TEXT_SUBS, type AudioTrack, type SubTrack } from "./probe.ts";
 import type { TrickInfo } from "./jobs.ts";
 
 /** Lo que la QN90B decodifica por hardware (Tizen 6.5). DTS y TrueHD no están. */
 const TV_VIDEO = new Set(["h264", "hevc", "vp9", "av1", "mpeg2video", "mpeg4"]);
-const TV_AUDIO = new Set(["aac", "ac3", "eac3", "mp3", "flac", "opus", "vorbis", "pcm_s16le", "pcm_s24le"]);
 const DONE_RATIO = 0.92;
 
 const img = (f: string | null) => (f ? `/img/${encodeURIComponent(f)}` : null);
@@ -132,17 +132,20 @@ export function media(id: number) {
   // Extraer en segundo plano el subtítulo por defecto para que esté listo al dar a play
   if (defSub != null) void vtt(m.id, defSub);
 
-  const reasons = [
-    !TV_VIDEO.has(m.vcodec ?? "") && `vídeo ${m.vcodec}`,
-    !audio.some((a) => TV_AUDIO.has(a.codec)) && `audio ${audio.map((a) => a.codec).join("/")}`,
-  ].filter(Boolean) as string[];
+  // El audio que la tele no entiende lo convertimos al vuelo; el vídeo no (sería recodificar 4K)
+  const videoOk = TV_VIDEO.has(m.vcodec ?? "");
+  const reasons = videoOk ? [] : [`vídeo ${m.vcodec}`];
+  const needsLive = !TV_AUDIO.has(defAudio?.codec ?? "aac");
 
   return {
     id: m.id, titleId: t.id, titleName: t.name, kind: t.kind, logo: img(t.logo), backdrop: img(t.backdrop),
     name: m.name, season: m.season, episode: m.episode, label: epLabel(m), duration: m.duration,
     width: m.width, height: m.height, hdr: m.hdr,
     stream: `/stream/${m.id}`,
-    directPlay: reasons.length === 0, unsupported: reasons,
+    /** Mismo vídeo con el audio no soportado convertido; para avanzar se pide con ?t=segundos. */
+    live: `/stream/${m.id}/live`,
+    mode: !videoOk ? "none" : needsLive ? "live" : "direct",
+    directPlay: videoOk && !needsLive, unsupported: reasons,
     position: p && !p.done ? p.position : 0,
     audio: audio.map((a, i) => ({ ...a, order: i, supported: TV_AUDIO.has(a.codec) })),
     subs: subs.filter((s) => TEXT_SUBS.has(s.codec)).map((s) => ({ ...s, url: `/subs/${m.id}/${s.index}.vtt` })),

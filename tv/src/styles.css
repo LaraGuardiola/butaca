@@ -419,7 +419,6 @@ button { font: inherit; color: inherit; cursor: pointer; outline: none; }
 .track.selected { color: var(--text); font-weight: 700; }
 .panel-open .osd-bottom, .panel-open .subtitles { opacity: 0; }
 .track.selected::before { content: '✓  '; color: var(--accent); }
-.track.unsupported { opacity: 0.45; }
 .track:focus { background: #fff; color: #000; }
 .track:focus::before { color: #000; }
 

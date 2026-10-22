@@ -3,7 +3,7 @@ import { get, post, url } from '../lib/server'
 import { onKey } from '../lib/keys'
 import { navHandler, pushScope } from '../lib/nav'
 import { back, replace } from '../lib/router'
-import { createPlayer, type Player as Engine } from '../lib/player'
+import { createPlayer, type Player as Engine, type PlayerEvents } from '../lib/player'
 import { activeCues, parseVtt, type Cue } from '../lib/vtt'
 import { clock, trackLabel } from '../lib/format'
 import type { MediaInfo } from '../types'
@@ -32,6 +32,8 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
   const [cues, setCues] = createSignal<Cue[]>([])
 
   let engine: Engine | undefined
+  /** Si el stream es el convertido al vuelo (audio DTS/TrueHD) */
+  let live = false
   let osdTimer: number | undefined
   let scrubTimer: number | undefined
   let scrubHits = 0
@@ -133,6 +135,43 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
     replace({ name: 'player', mediaId: next.id, startFromZero: true })
   }
 
+  const events: PlayerEvents = {
+    onTime: (s) => scrub() == null && setT(s),
+    onBuffering: setBuffering,
+    onEnd: () => playNext(),
+    onError: (e) => setError(e),
+  }
+
+  /** Arranca el motor: directo del fichero o, si el audio no lo entiende la tele, convertido al vuelo. */
+  async function start(asLive: boolean, at: number) {
+    const info = m()!
+    engine?.destroy()
+    live = asLive
+    engine = asLive
+      ? createPlayer(events, {
+          duration: info.duration,
+          startOf: (t) => get<{ t: number }>(`/api/live-start/${info.id}?t=${t.toFixed(2)}`).then((r) => r.t),
+        })
+      : createPlayer(events)
+    await engine.load(url(asLive ? info.live : info.stream)!, at, { uhd: info.width > 2000 })
+  }
+
+  /** Elegir audio: si la pista no la decodifica la tele, pasamos al stream convertido en el mismo punto. */
+  async function pickAudio(order: number, supported: boolean) {
+    setAudio(order)
+    if (supported || live) return engine?.setAudio(order)
+    const at = engine?.time() ?? t()
+    ready = false
+    try {
+      await start(true, at)
+      engine!.setAudio(order)
+      setPaused(false)
+      ready = true
+    } catch (e) {
+      setError((e as Error).message)
+    }
+  }
+
   function openPanel() {
     setPanel(true)
     showOsd(true)
@@ -224,16 +263,11 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
       setAudio(info.audio.findIndex((a) => a.default) >= 0 ? info.audio.findIndex((a) => a.default) : 0)
       void loadSub(info.defaultSub)
 
-      engine = createPlayer({
-        onTime: (s) => scrub() == null && setT(s),
-        onBuffering: setBuffering,
-        onEnd: () => playNext(),
-        onError: (e) => setError(e),
-      })
-      await engine.load(url(info.stream)!, props.startFromZero ? 0 : info.position, { uhd: info.width > 2000 })
-      setDur(engine.duration() || info.duration)
+      if (info.mode === 'none') throw new Error('Formato de vídeo no soportado')
+      await start(info.mode === 'live', props.startFromZero ? 0 : info.position)
+      setDur(engine!.duration() || info.duration)
       setBuffering(false)
-      setPaused(engine.isPaused())
+      setPaused(engine!.isPaused())
       ready = true
       showOsd()
       ambient('play')
@@ -320,14 +354,11 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
                   {(a) => (
                     <button
                       class="track"
-                      classList={{ selected: audio() === a.order, unsupported: !a.supported }}
+                      classList={{ selected: audio() === a.order }}
                       data-focusable
                       data-autofocus={audio() === a.order ? '' : undefined}
                       tabIndex={-1}
-                      onClick={() => {
-                        engine?.setAudio(a.order)
-                        setAudio(a.order)
-                      }}
+                      onClick={() => void pickAudio(a.order, a.supported)}
                     >
                       {trackLabel(a)}
                     </button>
@@ -369,7 +400,7 @@ export default function Player(props: { mediaId: number; startFromZero?: boolean
           <h2>No se puede reproducir</h2>
           <p>{error()}</p>
           <Show when={m()?.unsupported.length}>
-            <p>La tele no soporta: {m()!.unsupported.join(', ')}. La conversión al vuelo está en camino.</p>
+            <p>La tele no soporta: {m()!.unsupported.join(', ')}.</p>
           </Show>
           <p class="dim">Pulsa Atrás para volver</p>
         </div>
