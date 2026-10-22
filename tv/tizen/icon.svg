@@ -1,17 +1,28 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#1c0a0e"/><stop offset="1" stop-color="#08080b"/>
+      <stop offset="0" stop-color="#3a0a12"/>
+      <stop offset="1" stop-color="#12030a"/>
     </linearGradient>
-    <linearGradient id="seat" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0" stop-color="#ff4458"/><stop offset="1" stop-color="#b3132a"/>
+    <radialGradient id="spot" cx="0.5" cy="0.18" r="0.62">
+      <stop offset="0" stop-color="#ff6b6b" stop-opacity="0.55"/>
+      <stop offset="0.55" stop-color="#b3122a" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#b3122a" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#ffe2a3"/>
+      <stop offset="1" stop-color="#d79a3c"/>
     </linearGradient>
   </defs>
-  <rect width="512" height="512" rx="96" fill="url(#bg)"/>
-  <!-- butaca de cine: respaldo, asiento y reposabrazos -->
-  <rect x="146" y="104" width="220" height="200" rx="46" fill="url(#seat)"/>
-  <rect x="126" y="282" width="260" height="78" rx="30" fill="#e3263a"/>
-  <rect x="96" y="214" width="58" height="190" rx="26" fill="#c41d32"/>
-  <rect x="358" y="214" width="58" height="190" rx="26" fill="#c41d32"/>
-  <rect x="190" y="132" width="132" height="10" rx="5" fill="#fff" opacity=".18"/>
+  <rect width="512" height="512" fill="url(#bg)"/>
+  <rect width="512" height="512" fill="url(#spot)"/>
+  <!-- butaca de cine: respaldo, asiento abatible y brazos -->
+  <g fill="url(#gold)">
+    <rect x="166" y="138" width="180" height="168" rx="40"/>
+    <rect x="150" y="300" width="212" height="62" rx="24"/>
+    <rect x="112" y="236" width="50" height="146" rx="22"/>
+    <rect x="350" y="236" width="50" height="146" rx="22"/>
+    <rect x="148" y="376" width="26" height="46" rx="8"/>
+    <rect x="338" y="376" width="26" height="46" rx="8"/>
+  </g>
 </svg>

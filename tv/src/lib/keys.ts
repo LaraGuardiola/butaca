@@ -38,10 +38,18 @@ export function installKeys() {
   })
 }
 
+/** Sale de Butaca. Si está Salón (el launcher), vuelve a él en vez de caer en el inicio de Samsung. */
 export function exitApp() {
+  const exit = () => {
+    try {
+      tizen.application.getCurrentApplication().exit()
+    } catch { /* navegador */ }
+  }
   try {
-    tizen.application.getCurrentApplication().exit()
-  } catch { /* navegador */ }
+    tizen.application.launch('salonHome1.Salon', exit, exit)
+  } catch {
+    exit()
+  }
 }
 
 export const isTizen = () => typeof tizen !== 'undefined'
